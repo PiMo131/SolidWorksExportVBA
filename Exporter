@@ -1,0 +1,75 @@
+Sub ExportModelAndDrawing()
+
+    Dim swApp As SldWorks.SldWorks
+    Dim swModel As SldWorks.ModelDoc2
+    Dim swExportModel As SldWorks.ModelDoc2
+    Dim modelPath As String
+    Dim modelName As String
+    Dim folderPath As String
+    Dim stepPath As String
+    Dim pdfPath As String
+    Dim pdf3DPath As String
+    Dim drawingPath As String
+    Dim drawingExists As Boolean
+    Dim errors As Long
+    Dim warnings As Long
+    Dim fileType As Long
+    
+    Set swApp = Application.SldWorks
+    Set swModel = swApp.ActiveDoc
+    
+    If swModel Is Nothing Then
+        MsgBox "Er is geen bestand geopend."
+        Exit Sub
+    End If
+    
+    If swModel.GetType <> swDocPART And swModel.GetType <> swDocASSEMBLY Then
+        MsgBox "Open een part (.SLDPRT) of assembly (.SLDASM) om deze macro te gebruiken."
+        Exit Sub
+    End If
+    
+    ' Bepaal pad en naam
+    modelPath = swModel.GetPathName
+    folderPath = Left(modelPath, InStrRev(modelPath, "\"))
+    modelName = Mid(modelPath, InStrRev(modelPath, "\") + 1)
+    modelName = Left(modelName, InStrRev(modelName, ".") - 1)
+    
+    ' Bepaal bestandstype voor export
+    If swModel.GetType = swDocPART Then
+        fileType = swDocPART
+    Else
+        fileType = swDocASSEMBLY
+    End If
+    
+    ' Export STEP
+    stepPath = folderPath & modelName & ".STEP"
+    swModel.Extension.SaveAs stepPath, swSaveAsSTEP, swSaveAsOptions_Silent, Nothing, errors, warnings
+
+    ' Export 3D PDF
+    pdf3DPath = folderPath & modelName & "_3D.pdf"
+    swModel.Extension.SaveAs pdf3DPath, swSaveAs3DPDF, swSaveAsOptions_Silent, Nothing, errors, warnings
+
+    ' Zoek bijbehorende drawing
+    drawingPath = folderPath & modelName & ".SLDDRW"
+    drawingExists = Dir(drawingPath) <> ""
+    
+    If drawingExists Then
+        Set swExportModel = swApp.OpenDoc6(drawingPath, swDocDRAWING, swOpenDocOptions_Silent, "", errors, warnings)
+        
+        If Not swExportModel Is Nothing Then
+            pdfPath = folderPath & modelName & ".pdf"
+            swExportModel.Extension.SaveAs pdfPath, swSaveAsPDF, swSaveAsOptions_Silent, Nothing, errors, warnings
+            swApp.CloseDoc drawingPath
+        Else
+            MsgBox "Drawing kon niet geopend worden voor export."
+        End If
+    Else
+        MsgBox "Geen bijbehorende drawing gevonden: " & drawingPath
+    End If
+    
+    MsgBox "Export voltooid:" & vbCrLf & _
+           "- STEP: " & stepPath & vbCrLf & _
+           "- 3D PDF: " & pdf3DPath & vbCrLf & _
+           IIf(drawingExists, "- PDF drawing: " & pdfPath, "- Geen drawing gevonden.")
+
+End Sub
